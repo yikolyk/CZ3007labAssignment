@@ -1,0 +1,236 @@
+// package the generated Java class lives in; no need to change this
+%package "parser";
+
+// name of the generated Java class; no need to change this
+%class "Parser";
+
+// no need to change this either
+%embed {:
+   // turn off automated error recovery
+   @Override
+   protected void recoverFromError(Symbol token, TokenStream in) throws java.io.IOException, Exception {
+      super.recoverFromError(new Symbol(0), in);
+   }
+:};
+
+// the list of all terminals; no need to change this
+%terminals MODULE, INT, VOID, IF, ELSE, WHILE, RETURN, BREAK, BOOLEAN, PUBLIC, TRUE, FALSE,
+           INT_LITERAL, STRING_LITERAL, ID, TYPE, IMPORT,
+           PLUS, MINUS, TIMES, DIV, MOD, EQEQ, NEQ, LEQ, GEQ, LT, GT,
+           LBRACKET, RPAREN, COMMA, RCURLY, LCURLY, SEMICOLON, RBRACKET, LPAREN, EQL;
+           
+// declaration of start symbol; no need to change this
+%goal Module;
+
+// temporary declaration, you can remove this once you have written all other rules
+%goal Dummy;
+
+/* TODO: Flesh out the rule for Module, and add rules for other nonterminals. Here is an example
+         of a rule you may want to add:
+
+*/
+   
+   Module = MODULE ID LCURLY Imports Declarations RCURLY
+   ;
+      
+   Imports = Import Imports // Imports = Import*
+   | 
+   ;
+   
+   Import = IMPORT ID SEMICOLON
+   ;
+     
+   Declarations = Declaration Declarations // Declarations = Declaration*
+   | 
+   ;
+   
+   Declaration = FunctionDeclaration 
+   | FieldDeclaration 
+   | TypeDeclaration
+   ; 
+           
+   FunctionDeclaration = Accessibility TypeName ID LPAREN ParameterList RPAREN LCURLY StatementList RCURLY
+   ;
+   
+   FieldDeclaration = Accessibility TypeName ID SEMICOLON
+   ;
+   
+   TypeDeclaration = Accessibility TYPE ID EQL STRING_LITERAL SEMICOLON
+   ;
+   
+   TypeName = PrimitiveType 
+   | ArrayType 
+   | ID
+   ;   
+    
+   PrimitiveType = VOID 
+   | BOOLEAN 
+   | INT
+   ;
+   
+   /*
+   // This is a LALR conflict, need to expand the ArrayType
+   ArrayType = TypeName LBRACKET RBRACKET
+   ;
+   */
+   
+   // Expand the non-terminal symbol
+   ArrayType = PrimitiveType LBRACKET RBRACKET MultiDimensionTail    // initialise an array reference ex. int[] or int[][]...
+   | ID LBRACKET RBRACKET MultiDimensionTail                   // reference to an array ex. index[] or index[][]...
+   ;
+   
+   MultiDimensionTail = LBRACKET RBRACKET MultiDimensionTail
+   |
+   ;
+   
+   Accessibility = PUBLIC 
+   |
+   ;      
+   
+   ParameterList =  NonEmptyParameterList       // Either empty or not empty
+   |
+   ;
+   
+   /*
+   NonEmptyParameterList = Parameter            // One parameter
+   | Parameter COMMA NonEmptyParameterList      // Or more parameters
+   ;
+   */
+   
+   NonEmptyParameterList = Parameter NonEmptyParameterListTail
+   ;
+   
+   NonEmptyParameterListTail = COMMA Parameter NonEmptyParameterListTail
+   |
+   ;
+   
+   Parameter = TypeName ID
+   ;
+   
+   StatementList = Statement StatementList      // StatementList = Statement*
+   |
+   ;
+   
+   Statement = TypeName ID SEMICOLON         // local variable declaration
+   | LCURLY StatementList RCURLY             // block of statements
+   | IfStatement                       // if statement
+   | WHILE LPAREN Expression RPAREN Statement   // while statement
+   | BREAK SEMICOLON                   // break statement
+   | ReturnStatement                   // return statement
+   | Expression SEMICOLON                 // expression statement
+   ;
+   
+   // this conflict is resolved by Beaver automatically  
+   IfStatement = IF LPAREN Expression RPAREN Statement ELSE Statement   // this causes shift when "ELSE" token is read
+   | IF LPAREN Expression RPAREN Statement                        // this causes reduce when "ELSE" token is read
+   ;
+   
+   // this has no error
+   ReturnStatement = RETURN Expression SEMICOLON   
+   | RETURN SEMICOLON                        
+   ;        
+   
+   Expression = Assignment
+   | RhsExpression
+   ;
+   
+   Assignment = LhsExpression EQL Expression
+   ;
+   
+   /*
+   // Array Access with Left Recursion
+   LhsExpression = ID
+   | LhsExpression LBRACKET Expression RBRACKET
+   ;
+   */
+   
+   LhsExpression = ID LhsExpressionTail
+   ;
+   
+   LhsExpressionTail = LBRACKET Expression RBRACKET LhsExpressionTail
+   |
+   ;
+   
+   /*
+   RhsExpression = ArithmeticExpression ComparisonOperator ArithmeticExpression     // causes shift
+   | ArithmeticExpression                                            // causes reduce
+   ;
+   */
+   
+   RhsExpression = ArithmeticExpression RhsExpressionTail      
+   ;
+   
+   RhsExpressionTail = ComparisonOperator ArithmeticExpression
+   |
+   ;
+   
+   ComparisonOperator = EQEQ
+   | NEQ
+   | LT
+   | LEQ
+   | GT
+   | GEQ
+   ;
+   
+   /*
+   // ArithmeticExpression with Left Recursion
+   ArithmeticExpression = ArithmeticExpression AdditiveOperator Term
+   | Term
+   ;
+   */
+   
+   ArithmeticExpression = Term ArithmeticExpressionTail
+   ;
+   
+   ArithmeticExpressionTail = AdditiveOperator Term ArithmeticExpressionTail
+   |
+   ;
+   
+   AdditiveOperator = PLUS
+   | MINUS
+   ;
+   
+   /*
+   // Term with Left Recursion
+   Term = Term MultiplicativeOperator Factor
+   | Factor
+   ;
+   */
+   
+   Term = Factor TermTail
+   ;
+   
+   TermTail = MultiplicativeOperator Factor TermTail
+   |
+   ;
+   
+   MultiplicativeOperator = TIMES
+   | DIV
+   | MOD
+   ;
+   
+   Factor = MINUS Factor
+   | PrimaryExpression
+   ;
+   
+   PrimaryExpression = LhsExpression
+   | ID LPAREN ExpressionList RPAREN         // function call
+   | LBRACKET NonEmptyExpressionList RBRACKET   // array expression
+   | STRING_LITERAL
+   | INT_LITERAL
+   | TRUE
+   | FALSE
+   | LPAREN Expression RPAREN             // parenthesised expression
+   ;
+   
+   NonEmptyExpressionList = Expression
+   | Expression COMMA NonEmptyExpressionList
+   ;
+   
+   ExpressionList = NonEmptyExpressionList      // one or many expressions
+   |                                // empty expression
+   ;
+
+/* Dummy rule to make the lexer compile. Remove this once you have written all other rules. */    
+Dummy = MODULE INT VOID IF ELSE WHILE RETURN BREAK BOOLEAN PUBLIC TRUE FALSE INT_LITERAL STRING_LITERAL ID TYPE IMPORT
+           PLUS MINUS TIMES DIV MOD EQEQ NEQ LEQ GEQ LT GT LBRACKET RPAREN COMMA RCURLY LCURLY SEMICOLON RBRACKET LPAREN EQL;
